@@ -1,97 +1,96 @@
 # OSAC Test Infrastructure
 
-Ansible-based test infrastructure for OSAC end-to-end testing.
+End-to-end test suite for OSAC. Tests the full stack: fulfillment CLI/API, operator, AAP provisioning, and KubeVirt VM lifecycle.
 
-## Overview
+## Test Framework
 
-This repository contains automated testing capabilities for OSAC hub creation and management through the OSAC fulfillment service.
+Tests are written in pytest. The existing Ansible playbooks remain in `playbooks/` and `roles/` for reference during the migration period.
 
-## Architecture
+## Directory Structure
 
-### Directory Structure
 ```
-playbooks/          # Main Ansible playbooks for executing tests
-roles/              # Reusable Ansible roles for test functionality
-├── fulfillment_cli_base/     # Base role for fulfillment CLI operations
-├── test_hub_creation/        # Hub creation/deletion testing
+tests/
+├── conftest.py          # Session fixtures: cli, grpc, k8s, k8s_vm
+├── runner.py            # Execution primitives: run, run_unchecked, poll_until, env
+├── k8s_client.py        # K8sClient — kubectl wrapper (hub + VM cluster)
+├── grpc_client.py       # GRPCClient — grpcurl wrapper
+├── fulfillment_cli.py   # FulfillmentCLI — fulfillment-cli wrapper
+└── vmaas/               # VMaaS test suite
+    ├── test_compute_instance_creation.py          # Full VM lifecycle
+    ├── test_compute_instance_delete_during_provision.py  # Delete while provisioning
+    ├── test_compute_instance_restart.py           # Restart via gRPC
+    ├── test_compute_instance_restart_negative.py  # Past timestamp ignored
+    ├── test_compute_instance_api_fields.py        # Mutability/immutability
+    └── test_compute_instance_cli_fields.py        # CLI fields + K8s verification
+playbooks/    # Legacy Ansible tests
+roles/        # Legacy Ansible roles
 ```
-
-### Core Components
-
-**Hub Creation Testing**
-- Hub creation and registration using fulfillment-cli
-- Hub verification through gRPC API calls
-- Automated cleanup of hub resources and temporary files
-
-**Communication Methods**
-- `fulfillment-cli` for hub creation operations
-- `grpcurl` for direct API communication with fulfillment service
-- gRPC authentication using Bearer tokens
 
 ## Quick Start
 
 ### Prerequisites
-- Ansible installed
-- Access to OSAC fulfillment service
-- `fulfillment-cli` binary
-- `grpcurl` for gRPC API calls
 
-### Running Tests
+- Python 3.11+
+- `fulfillment-cli` binary (matching the deployed fulfillment-service version)
+- `grpcurl` (Go binary: `go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest`)
+- `oc` / `kubectl` with cluster-admin access
+- A running OSAC deployment
 
-Execute hub creation test:
+### Install
+
 ```bash
-ansible-playbook playbooks/test_hub_creation.yml
+uv sync
+```
+
+### Run Tests
+
+```bash
+# Run VMaaS tests against your cluster
+OSAC_NAMESPACE=osac-devel make test-vmaas
+
+# Run a single test by name
+TEST=test_compute_instance_lifecycle make test-vmaas
+```
+
+### Makefile Targets
+
+```
+make test-vmaas
+make lint
+make format
 ```
 
 ## Configuration
 
-### Variables (Found in group_vars/all.yml)
+All configuration via environment variables. Same vars work in local dev and CI.
 
-- KUBECONFIG: Path to your KUBECONFIG
-- fulfillment_cli_path: Where to find fulfillment-cli
-- test_namespace: What namespace to use
-- testing_workspace: What directory to put your test results in
-- cluster_domain_suffix: The service dns entry for your cluster. (ie apps.hcp.local.lab)
-- fulfillment_app_name: Kubernetes app name for your fulfillment api service.
-- fulfillment_port: Listening port for your fulfillment-api
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OSAC_NAMESPACE` | `osac-devel` | Namespace where OSAC is deployed |
+| `KUBECONFIG` | `~/.kube/config` | Kubeconfig for the hub (management cluster) |
+| `OSAC_VM_KUBECONFIG` | **(required)** | Kubeconfig for the VM cluster (where VirtualMachines run). In single-cluster setups, set this to the same value as `KUBECONFIG`. |
+| `OSAC_FULFILLMENT_ADDRESS` | auto-derived | Fulfillment API address (`host:port`) |
+| `OSAC_VM_TEMPLATE` | `osac.templates.ocp_virt_vm` | ComputeInstance template to use |
+| `OSAC_SERVICE_ACCOUNT` | `admin` | ServiceAccount for token generation |
+| `FULFILLMENT_CLI_PATH` | `fulfillment-cli` | Path to the CLI binary |
+| `TEST` | (none) | pytest `-k` filter — run only tests matching this name substring |
 
-- osac_installer_fulfillment_address: "{{ fulfillment_app_name }}-{{ test_namespace }}.{{ cluster_domain_suffix }}:{{ fulfillment_port }}"
-- fulfillment_token_script: "oc create token fulfillment-admin -n {{ test_namespace }} --duration 1h --as system:admin"
+### Two-Kubeconfig Design
 
-### Hub creation specific overrides
-- hub_service_account: "fulfillment-admin"
-- hub_token_namespace: "{{ test_namespace }}"
-- hub_token_duration: "1h"
+Tests access two clusters:
+- **Hub** (`KUBECONFIG`) — where ComputeInstance CRs, jobs, and the fulfillment service live
+- **VM cluster** (`OSAC_VM_KUBECONFIG`) — where VirtualMachine and VirtualMachineInstance resources live
 
+In single-cluster dev setups (VMs run on the hub): set `OSAC_VM_KUBECONFIG` to the same value as `KUBECONFIG`.
 
-### Fulfillment Address Configuration
+In two-cluster setups: set `OSAC_VM_KUBECONFIG` to the virt cluster kubeconfig. The hub kubeconfig manages CRs, the VM kubeconfig verifies VM state.
 
-The fulfillment address follows standard OpenShift application naming:
+## Legacy Ansible Tests
+
+The Ansible playbooks in `playbooks/` and `roles/` are the original test implementations. They will be removed once pytest reaches full parity and is verified in CI.
+
+To run Ansible tests:
+
+```bash
+ansible-playbook playbooks/test_compute_instance_creation.yml -e test_namespace=osac-devel
 ```
-<app-name>-<namespace>.<cluster-domain>:<port>
-```
-
-Configuration variables:
-- `fulfillment_app_name` - Application name (default: "fulfillment-api")
-- `test_namespace` - Target namespace
-- `cluster_domain_suffix` - User-configurable cluster domain (e.g., "apps.hcp.local.lab")
-- `fulfillment_port` - Service port (default: "443")
-
-The complete address is automatically constructed as:
-```
-fulfillment-api-foobar.apps.hcp.local.lab:443
-```
-
-## Test Execution Flow
-
-1. **Setup**: Display test information and parameters
-2. **Creation**: Create hub using fulfillment-cli
-3. **Verification**: Verify hub registration via gRPC API
-4. **Cleanup**: Delete hub and remove temporary files
-5. **Logging**: Record test results to test-execution.log
-
-## Error Handling
-
-- Hub deletion verification ensures proper cleanup
-- All operations include proper error logging and failure messages
-- Retry functionality available through Ansible retry files
