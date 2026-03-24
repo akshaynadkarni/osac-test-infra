@@ -6,3 +6,16 @@ fulfillment-cli
 
 # Temporary files
 *.retry
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Test reports
+reports/
