@@ -33,15 +33,18 @@
     success_msg: ComputeInstance {{ test_compute_instance_creation_result.stdout }} successfully registered and verified via gRPC
 
 # Job status verification - provision flow
-- name: Get ComputeInstance name from Kubernetes
+- name: Wait for ComputeInstance CR to appear on cluster
   ansible.builtin.shell:
     cmd: >
       kubectl --as system:admin get computeinstance
       -n {{ test_namespace }}
-      -l cloudkit.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
+      -l osac.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
       -o jsonpath='{.items[0].metadata.name}'
   register: ci_name_result
   changed_when: false
+  retries: 12
+  delay: 10
+  until: ci_name_result.rc == 0 and ci_name_result.stdout != ""
 
 - name: Display ComputeInstance name
   ansible.builtin.debug:

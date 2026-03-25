@@ -7,7 +7,7 @@
     cmd: >
       kubectl --as system:admin get computeinstance
       -n {{ test_namespace }}
-      -l cloudkit.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
+      -l osac.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
       -o jsonpath='{.items[0].status.phase}'
   register: ci_phase_check
   until: ci_phase_check.stdout == "Running"
@@ -20,7 +20,7 @@
     cmd: >
       kubectl --as system:admin get computeinstance
       -n {{ test_namespace }}
-      -l cloudkit.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
+      -l osac.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
       -o jsonpath='{.items[0].metadata.name}'
   register: ci_name_result
   changed_when: false
@@ -43,7 +43,7 @@
     cmd: >
       kubectl --as system:admin get virtualmachineinstance
       -n {{ vmi_namespace_result.stdout }}
-      -l cloudkit.openshift.io/computeinstance={{ compute_instance_name }}
+      -l osac.openshift.io/computeinstance={{ compute_instance_name }}
       -o jsonpath='{.items[0].metadata.creationTimestamp}'
   register: original_vmi_timestamp
   changed_when: false
@@ -132,7 +132,7 @@
     cmd: >
       kubectl --as system:admin get virtualmachineinstance
       -n {{ vmi_namespace_result.stdout }}
-      -l cloudkit.openshift.io/computeinstance={{ compute_instance_name }}
+      -l osac.openshift.io/computeinstance={{ compute_instance_name }}
       -o jsonpath='{.items[0].metadata.creationTimestamp}'
   register: new_vmi_timestamp_check
   until: new_vmi_timestamp_check.stdout != original_vmi_timestamp.stdout
