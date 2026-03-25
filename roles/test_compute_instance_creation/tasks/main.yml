@@ -38,7 +38,7 @@
     cmd: >
       kubectl --as system:admin get computeinstance
       -n {{ test_namespace }}
-      -l cloudkit.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
+      -l osac.openshift.io/computeinstance-uuid={{ compute_instance_order_uuid }}
       -o jsonpath='{.items[0].metadata.name}'
   register: ci_name_result
   changed_when: false
