@@ -8,6 +8,7 @@
       --memory-gib {{ memory_gib | default(4) }}
       --boot-disk-size {{ boot_disk_size | default(20) }}
       --image {{ image | default('quay.io/containerdisks/fedora:latest') }}
+      --image-source-type {{ image_source_type | default('registry') }}
       --run-strategy {{ run_strategy | default('Always') }}
   register: test_compute_instance_creation_result
   changed_when: test_compute_instance_creation_result.rc == 0
