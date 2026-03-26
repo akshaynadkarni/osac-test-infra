@@ -5,8 +5,8 @@
       {{ fulfillment_cli_path }} create computeinstance
       --template {{ template }}
       --cores {{ cores | default(2) }}
-      --memory-gib {{ memory_gib | default(2) }}
-      --boot-disk-size {{ boot_disk_size | default(10) }}
+      --memory-gib {{ memory_gib | default(4) }}
+      --boot-disk-size {{ boot_disk_size | default(20) }}
       --image {{ image | default('quay.io/containerdisks/fedora:latest') }}
       --run-strategy {{ run_strategy | default('Always') }}
   register: test_compute_instance_creation_result
